@@ -17,95 +17,55 @@ import {
 } from "@solana/web3.js";
 
 (async () => {
-  //////////////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////////
+  console.log("Payer Address", payer.publicKey.toBase58());
 
-  console.log("Payer address:", payer.publicKey.toBase58());
-
-  //////////////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////////
-
-  // get the current balance of the `payer` account on chain
   const currentBalance = await connection.getBalance(payer.publicKey);
-  console.log("Current balance of 'payer' (in lamports):", currentBalance);
-  console.log("Current balance of 'payer' (in SOL):", currentBalance / LAMPORTS_PER_SOL);
+  console.log("Current Balance of 'payer' (in Lamports)", currentBalance);
+  console.log("Current Balance of 'payer' (in SOL)", currentBalance / LAMPORTS_PER_SOL);
 
-  // airdrop on low balance
   if (currentBalance <= LAMPORTS_PER_SOL) {
-    console.log("Low balance, requesting an airdrop...");
-    await connection.requestAirdrop(payer.publicKey, LAMPORTS_PER_SOL);
+    console.log("Requesting airdrop...");
+    await connection.requestAirdrop(payer.publicKey, LAMPORTS_PER_SOL * 4);
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////////
-
-  // generate a new, random address to create on chain
   const keypair = Keypair.generate();
 
-  console.log("New keypair generated:", keypair.publicKey.toBase58());
+  console.log("New Keypair generated", keypair.publicKey.toBase58());
 
-  /**
-   * create a simple instruction (using web3.js) to create an account
-   */
-
-  // on-chain space to allocated (in number of bytes)
+  // On chain space to be allocated
   const space = 0;
-
-  // request the cost (in lamports) to allocate `space` number of bytes on chain
   const lamports = await connection.getMinimumBalanceForRentExemption(space);
 
-  console.log("Total lamports:", lamports);
+  //Create a simple instruction to create an account
 
-  // create this simple instruction using web3.js helper function
-  const createAccountIx = SystemProgram.createAccount({
-    // `fromPubkey` - this account will need to sign the transaction
+  const createAcccountIx = SystemProgram.createAccount({
     fromPubkey: payer.publicKey,
-    // `newAccountPubkey` - the account address to create on chain
     newAccountPubkey: keypair.publicKey,
-    // lamports to store in this account
+    //lamports stored in this account
     lamports,
-    // total space to allocate
     space,
-    // the owning program for this account
     programId: SystemProgram.programId,
   });
 
-  /**
-   * build the transaction to send to the blockchain
-   */
+  //Build the transaction to send to the blockchain
+  const recentBlockhash = await connection.getRecentBlockhash();
 
-  // get the latest recent blockhash
-  let recentBlockhash = await connection.getLatestBlockhash().then(res => res.blockhash);
-
-  // create a message (v0)
+  // Create a message (v0)
   const message = new TransactionMessage({
     payerKey: payer.publicKey,
-    recentBlockhash,
-    instructions: [createAccountIx],
+    recentBlockhash: recentBlockhash.blockhash,
+    instructions: [createAcccountIx],
   }).compileToV0Message();
 
-  // create a versioned transaction using the message
+  // Create a vertioned transaction
   const tx = new VersionedTransaction(message);
-
-  // console.log("tx before signing:", tx);
-
-  // sign the transaction with our needed Signers (e.g. `payer` and `keypair`)
+  console.log("Transaction", tx);
+  //sign the transaction with the payer and the new keypair ( all keypairs must sign the transaction )
   tx.sign([payer, keypair]);
 
   console.log("tx after signing:", tx);
-
-  // tx.signatures.toString("base58")
-
-  // console.log(tx.signatures);
-
-  // actually send the transaction
   const sig = await connection.sendTransaction(tx);
-
-  /**
-   * display some helper text
-   */
   printConsoleSeparator();
-
-  console.log("Transaction completed.");
-  console.log(explorerURL({ txSignature: sig }));
+  console.log("Transaction Signature:", sig);
+  console.log("Explorer URL:", explorerURL({ txSignature: sig }));
 })();

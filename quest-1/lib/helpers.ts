@@ -315,7 +315,7 @@ export async function buildTransaction({
 
   const tx = new VersionedTransaction(messageV0);
 
-  signers.forEach(s => tx.sign([s]));
+	tx.sign(signers);
 
   return tx;
 }

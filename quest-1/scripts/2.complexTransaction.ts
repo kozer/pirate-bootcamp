@@ -4,10 +4,10 @@
  */
 
 // import custom helpers for demos
-import { payer, testWallet, connection, STATIC_PUBLICKEY } from "@/lib/vars";
+import { payer, testWallet, connection } from "@/lib/vars";
 import { buildTransaction, explorerURL, printConsoleSeparator } from "@/lib/helpers";
 
-import { SystemProgram, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import { SystemProgram } from "@solana/web3.js";
 
 (async () => {
 

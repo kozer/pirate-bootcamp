@@ -94,7 +94,6 @@ import { Metaplex, bundlrStorage, keypairIdentity } from "@metaplex-foundation/j
   printConsoleSeparator("NFT created:");
   console.log(explorerURL({ txSignature: response.signature }));
 
-  return;
 
   /**
    *
@@ -104,7 +103,7 @@ import { Metaplex, bundlrStorage, keypairIdentity } from "@metaplex-foundation/j
 
   // you can also use the metaplex sdk to retrieve info about the NFT's mint
   const mintInfo = await metaplex.nfts().findByMint({
-    mintAddress: tokenMint,
+    mintAddress: nft.address,
   });
   console.log(mintInfo);
 })();

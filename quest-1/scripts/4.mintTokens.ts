@@ -25,11 +25,9 @@ import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
     return console.warn("No local keys were found. Please run '3.createTokenWithMetadata.ts'");
 
   const tokenMint: PublicKey = localKeys.tokenMint;
-
-  console.log("==== Local PublicKeys loaded ====");
+  console.log("==== Local PublicKeys Loaded ====");
   console.log("Token's mint address:", tokenMint.toBase58());
   console.log(explorerURL({ address: tokenMint.toBase58() }));
-
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
@@ -43,14 +41,13 @@ import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
    * the ata is then owned by the user's wallet
    */
 
-  // get or create the token's ata
+  // get or create token's ata
   const tokenAccount = await getOrCreateAssociatedTokenAccount(
     connection,
     payer,
     tokenMint,
     payer.publicKey,
   ).then(ata => ata.address);
-
   /*
     note: when creating an ata, the instruction will allocate space on chain
     if you attempt to allocate space at an existing address on chain, the transaction will fail.
@@ -62,8 +59,7 @@ import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
   // directly create the ata
   // const tokenAccount = await createAccount(connection, payer, tokenMint, payer.publicKey);
 
-  console.log("Token account address:", tokenAccount.toBase58());
-
+  console.log("Token's ATA address:", tokenAccount.toBase58());
   /**
    * The number of tokens to mint takes into account the `decimal` places set on your `tokenMint`.
    * So ensure you are minting the correct, desired number of tokens.
@@ -76,8 +72,7 @@ import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 
   const amountOfTokensToMint = 1_000;
 
-  // mint some token to the "ata"
-  console.log("Minting some tokens to the ata...");
+  // mint tokens to the ata
   const mintSig = await mintTo(
     connection,
     payer,

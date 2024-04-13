@@ -6,7 +6,6 @@
 import { payer, testWallet, connection } from "@/lib/vars";
 
 import {
-  buildTransaction,
   explorerURL,
   extractSignatureFromFailedTransaction,
   printConsoleSeparator,
@@ -20,6 +19,7 @@ import {
   PROGRAM_ID as METADATA_PROGRAM_ID,
   createCreateMetadataAccountV3Instruction,
 } from "@metaplex-foundation/mpl-token-metadata";
+import { TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 
 (async () => {
   //////////////////////////////////////////////////////////////////////////////
@@ -33,49 +33,38 @@ import {
 
   // generate a new keypair to be used for our mint
   const mintKeypair = Keypair.generate();
+  console.log("Mint Keypair Address:", mintKeypair.publicKey.toBase58());
 
-  console.log("Mint address:", mintKeypair.publicKey.toBase58());
-
-  // define the assorted token config settings
   const tokenConfig = {
-    // define how many decimals we want our tokens to have
+    // define the number of decimals the token should have
     decimals: 2,
-    //
+    //define the token's name
     name: "Seven Seas Gold",
-    //
+    //define the token's symbol
     symbol: "GOLD",
-    //
-    uri: "https://thisisnot.arealurl/info.json",
+    //define the token's uri
+    uri: "https://thisisnot.arealurl/gold.json",
   };
 
-  // image url: https://bafybeihkc3tu4ugc5camayoqw7tl2lahtzgm2kpiwps3itvfsv7zcmceji.ipfs.nftstorage.link/
-
-  /**
-   * Build the 2 instructions required to create the token mint:
-   * - standard "create account" to allocate space on chain
-   * - initialize the token mint
-   */
-
-  // create instruction for the token mint account
-  const createMintAccountInstruction = SystemProgram.createAccount({
+  // Build 2 instructions to create the token.
+  // - standard "create account" to allocate space for the token
+  // - initialize the token mint
+  const createMintAccountIx = SystemProgram.createAccount({
     fromPubkey: payer.publicKey,
     newAccountPubkey: mintKeypair.publicKey,
-    // the `space` required for a token mint is accessible in the `@solana/spl-token` sdk
     space: MINT_SIZE,
-    // store enough lamports needed for our `space` to be rent exempt
     lamports: await connection.getMinimumBalanceForRentExemption(MINT_SIZE),
-    // tokens are owned by the "token program"
+    // Tokens are owned by the token program
     programId: TOKEN_PROGRAM_ID,
   });
 
-  // Initialize that account as a Mint
-  const initializeMintInstruction = createInitializeMint2Instruction(
+  //Initialize that account as a mint
+  const initializeMintIx = createInitializeMint2Instruction(
     mintKeypair.publicKey,
     tokenConfig.decimals,
     payer.publicKey,
     payer.publicKey,
   );
-
   /**
    * Alternatively, you could also use the helper function from the
    * `@solana/spl-token` sdk to create and initialize the token's mint
@@ -84,41 +73,30 @@ import {
    * sign and pay for multiple transactions to perform all the actions. It
    * would also require more "round trips" to the blockchain as well.
    * But this option is available, should it fit your use case :)
-   * */
-
-  /*
-  console.log("Creating a token mint...");
-  const mint = await createMint(
-    connection,
-    payer,
-    // mint authority
-    payer.publicKey,
-    // freeze authority
-    payer.publicKey,
-    // decimals - use any number you desire
-    tokenConfig.decimals,
-    // manually define our token mint address
-    mintKeypair,
-  );
-  console.log("Token's mint address:", mint.toBase58());
-  */
-
-  /**
-   * Build the instruction to store the token's metadata on chain
-   * - derive the pda for the metadata account
-   * - create the instruction with the actual metadata in it
+	 *
+			const mint = await createMint(
+				connection,
+				payer,
+				// Mint authority
+				payer.publicKey,
+				//Feeze authority
+				payer.publicKey,
+				tokenConfig.decimals,
+				mintKeypair,
+			);
    */
 
-  // derive the pda address for the Metadata account
+  // Build the instruction to store the token's metadata in the blockchain
+  // - derive the PDA for the metadata account
+  // - create the instruction with the actual metadata in it
+
+  // derive the PDA
   const metadataAccount = PublicKey.findProgramAddressSync(
     [Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), mintKeypair.publicKey.toBuffer()],
     METADATA_PROGRAM_ID,
   )[0];
 
-  console.log("Metadata address:", metadataAccount.toBase58());
-
-  // Create the Metadata account for the Mint
-  const createMetadataInstruction = createCreateMetadataAccountV3Instruction(
+  const createMetadataIx = createCreateMetadataAccountV3Instruction(
     {
       metadata: metadataAccount,
       mint: mintKeypair.publicKey,
@@ -137,7 +115,7 @@ import {
           collection: null,
           uses: null,
         },
-        // `collectionDetails` - for non-nft type tokens, normally set to `null` to not have a value set
+        //`collectionDetails` - for non nft type tokens, normally set to null to not have a value set
         collectionDetails: null,
         // should the metadata be updatable?
         isMutable: true,
@@ -145,27 +123,24 @@ import {
     },
   );
 
-  /**
-   * Build the transaction to send to the blockchain
-   */
+  // Get blockhash
+  const blockhash = await connection.getRecentBlockhash().then(res => res.blockhash);
+  // Create the transaction message
+  const vMessage = new TransactionMessage({
+    payerKey: payer.publicKey,
+    instructions: [createMintAccountIx, initializeMintIx, createMetadataIx],
+    recentBlockhash: blockhash,
+  }).compileToV0Message();
 
-  const tx = await buildTransaction({
-    connection,
-    payer: payer.publicKey,
-    signers: [payer, mintKeypair],
-    instructions: [
-      createMintAccountInstruction,
-      initializeMintInstruction,
-      createMetadataInstruction,
-    ],
-  });
+  // Create tx
+  const tx = new VersionedTransaction(vMessage);
 
+  // Sign it
+  tx.sign([payer, mintKeypair]);
   printConsoleSeparator();
 
   try {
-    // actually send the transaction
     const sig = await connection.sendTransaction(tx);
-
     // print the explorer url
     console.log("Transaction completed.");
     console.log(explorerURL({ txSignature: sig }));
@@ -179,7 +154,6 @@ import {
     // attempt to extract the signature from the failed transaction
     const failedSig = await extractSignatureFromFailedTransaction(connection, err);
     if (failedSig) console.log("Failed signature:", explorerURL({ txSignature: failedSig }));
-
     throw err;
   }
 })();
